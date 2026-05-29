@@ -5,17 +5,16 @@
 #define DATA_LEN    10000
 #define CHUNK_SIZE    100
 
-/* Total floats needed: last chunk starts at 100*(DATA_LEN-100) = 990000 */
-static float sensor_data[100 * DATA_LEN];
+static float sensor_data[DATA_LEN];
 
 typedef struct {
     float *data;
     int    data_len;
 } filter_args_t;
 
-/* Stub — implementation not required for this exercise */
 static void apply_transform(float *data, int len) {
-    (void)data; (void)len;
+    for (int i = 0; i < len; i++)
+        data[i] = data[i] * data[i] + 1.0f;
 }
 
 /* Stub — simulates sensor acquisition */
@@ -93,7 +92,7 @@ static void parallel_body(void *arg)
 void cluster_fn()
 {
     /* Initialize sensor data (runs on core 0 before the fork) */
-    for (int i = 0; i < 100 * DATA_LEN; i++)
+    for (int i = 0; i < DATA_LEN; i++)
         sensor_data[i] = (float)i * 0.001f;
 
     filter_args_t args = {

@@ -33,8 +33,6 @@ void cluster_fn() {
         for (int i = 0; i < N; i++)
             sensor_data[i] = (float)i * 0.001f;
     }
-    /* Barrier so all cores see initialized data before the timed region */
-    #pragma omp barrier
 
     float result = 0.0f;
 

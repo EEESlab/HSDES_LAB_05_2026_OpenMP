@@ -3,15 +3,11 @@
 #include "math.h"
 #include "perf.h"
 
-#define M 400
+#define M  60
 #define N 350
 
-/*
- * PI_L1 — placed in the shared L1 TCDM (banked, low-latency scratchpad)
- * PI_L2 — placed in L2 (higher latency, larger capacity)
- */
-PI_L1 int A[M * N];
-PI_L1 int B[M * N];
+PI_L2 int A[M * N];
+PI_L2 int B[M * N];
 PI_L2 int C[M * N];
 
 /* Stubs — implementations not required for this exercise */
@@ -36,7 +32,7 @@ static void send(int *c)           { (void)c; }            /* 400 instructions, 
  *
  *   (a) Hoist #pragma omp parallel OUTSIDE the outer loop.
  *       Opening/closing a parallel region has significant overhead (120/40 instr).
- *       Placing the pragma inside the outer loop would pay this cost M-1=399 times.
+ *       Placing the pragma inside the outer loop would pay this cost M-1=59 times.
  *       Opening it once, before the outer loop, pays it only once.
  *
  *   (b) Place #pragma omp for schedule(static) on the inner loop.
@@ -69,9 +65,9 @@ static void send(int *c)           { (void)c; }            /* 400 instructions, 
  *
  *   Sequential instructions:
  *     update:       20 000
- *     outer*inner:  (M-1) * N * (5+12) = 399 * 350 * 17 = 2 374 050
+ *     outer*inner:  (M-1) * N * (5+12) = 59 * 350 * 17 = 350 350
  *     send:            400
- *     Total T_seq = 2 394 450 instructions
+ *     Total T_seq = 370 750 instructions
  *
  *   Parallel critical path (worst-case core: 44 inner iters × (M-1) outer iters):
  *     update (seq):        20 000
@@ -80,6 +76,7 @@ static void send(int *c)           { (void)c; }            /* 400 instructions, 
  *                                44*(5+12) (inner work, worst core) +
  *                                5 (static for overhead per chunk) +
  *                                10 (implicit barrier) ]
+ *                    = 59 * [ 1750 + 748 + 15 ] = 59 * 2513 = 148 267
  *     send (seq):             400
  *     close parallel:          40
  *   Speedup = T_seq / T_par  (apply CPI from [2.1] to convert to time)
@@ -91,25 +88,18 @@ static void send(int *c)           { (void)c; }            /* 400 instructions, 
  *   Parallel (parallel phase):    P = Puncore + 8*Pactive = 2 + 8 = 10.00 mW
  *   Energy gain = E_seq / E_par  = (P_seq * T_seq) / (P_seq*T_seq_parts + P_par*T_par_part)
  *
- * TODO [2.2a]: Add #pragma omp parallel with the correct data clauses before the outer for loop.
- *
- * TODO [2.2b]: Add #pragma omp for schedule(static) before the inner for loop.
  */
 void func() {
-    update(A, B);  /* 20000 instructions — sequential, cannot be parallelized */
+    update(A, B);
 
     for (int i = 1; i < M; i++) {
         for (int j = 0; j < N; j++) {  /* Loop setup -> 5 instructions */
             /* Update C[i*N+j] -> 12 instructions */
             C[i * N + j] = 2 * A[i * N + j] + 2 * B[i * N + j] + C[(i - 1) * N + j];
         }
-        /* implicit barrier at end of omp for — DO NOT add nowait:
-         * ensures row i is fully written before any core reads it
-         * in the next outer iteration                               */
     }
-    /* closing brace of #pragma omp parallel */
 
-    send(C);  /* 400 instructions — sequential, cannot be parallelized */
+    send(C);
 }
 
 void cluster_fn() {
